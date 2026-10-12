@@ -1,0 +1,177 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, interactive-widget=resizes-content, user-scalable=no">
+<meta name="theme-color" content="#0e1116">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="AI Studio">
+<meta name="format-detection" content="telephone=no">
+<meta name="color-scheme" content="dark">
+<title>AI Code Studio</title>
+<link rel="manifest" href="manifest.json">
+<link rel="icon" type="image/svg+xml" href="icon.svg">
+<link rel="apple-touch-icon" href="icon.svg">
+<link rel="stylesheet" href="styles.css">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+</head>
+<body>
+<div id="app">
+  <div class="backdrop" id="backdrop" aria-hidden="true"></div>
+
+  <!-- Sidebar с чатами -->
+  <aside class="sidebar" id="sidebar">
+    <div class="sidebar-header">
+      <h1>AI Code Studio</h1>
+      <button id="new-chat-btn" class="btn-primary">+ Новый чат</button>
+    </div>
+    <div class="chat-list" id="chat-list"></div>
+    <div class="sidebar-footer">
+      <button id="install-btn" class="btn-ghost" style="display:none;">📲 Установить приложение</button>
+      <button id="settings-btn" class="btn-ghost">⚙️ Настройки</button>
+    </div>
+  </aside>
+
+  <!-- Чат -->
+  <main class="chat-area">
+    <header class="chat-header">
+      <button id="menu-btn" class="icon-btn" title="Чаты" aria-label="Меню чатов">☰</button>
+      <button id="ai-status" class="ai-status" title="Статус ИИ — нажмите для проверки">●</button>
+      <span id="chat-title">Новый чат</span>
+      <div class="header-actions">
+        <button id="toggle-files-btn" class="icon-btn" title="Файлы" aria-label="Файлы проекта">📁</button>
+      </div>
+    </header>
+
+    <div class="messages" id="messages">
+      <div class="empty-state">
+        <h2>Начните диалог</h2>
+        <p>Опишите, что нужно сделать — ИИ может создавать, редактировать и удалять файлы проекта.</p>
+      </div>
+    </div>
+
+    <div class="composer">
+      <textarea id="input" placeholder="Напишите сообщение..." enterkeyhint="send" autocomplete="off" autocapitalize="sentences" spellcheck="false"></textarea>
+      <button id="send-btn" class="btn-primary btn-send" aria-label="Отправить">➤</button>
+      <button id="stop-btn" class="btn-danger btn-send" style="display:none;" aria-label="Стоп">■</button>
+    </div>
+  </main>
+
+  <!-- Панель файлов -->
+  <aside class="files-panel" id="files-panel">
+    <div class="files-header">
+      <h3>Файлы проекта</h3>
+      <div class="files-actions">
+        <button id="import-files-btn" class="icon-btn" title="Импорт файлов" aria-label="Импорт">⬆️</button>
+        <button id="export-all-btn" class="icon-btn" title="Экспорт ZIP" aria-label="Экспорт">⬇️</button>
+        <button id="close-files-btn" class="icon-btn mobile-only" title="Закрыть" aria-label="Закрыть">✕</button>
+      </div>
+    </div>
+    <input type="file" id="file-input" multiple hidden>
+    <div class="file-list" id="file-list">
+      <div class="empty-files">Пока нет файлов.<br><small>Импортируйте или попросите ИИ создать.</small></div>
+    </div>
+    <div class="file-preview" id="file-preview"></div>
+  </aside>
+</div>
+
+<!-- Модальное окно настроек -->
+<div class="modal" id="settings-modal">
+  <div class="modal-content">
+    <div class="modal-header">
+      <h2>Настройки</h2>
+      <button id="close-settings" class="icon-btn" aria-label="Закрыть">✕</button>
+    </div>
+    <div class="modal-body">
+      <div class="tabs">
+        <button class="tab active" data-tab="api">API</button>
+        <button class="tab" data-tab="gen">Генерация</button>
+        <button class="tab" data-tab="prompt">Промпт</button>
+      </div>
+
+      <div class="tab-content active" data-tab="api">
+        <label>API URL
+          <input type="text" id="set-apiUrl" placeholder="https://api.openai.com/v1/chat/completions" inputmode="url" autocapitalize="off" autocorrect="off" spellcheck="false">
+        </label>
+        <label>API Key
+          <input type="password" id="set-apiKey" placeholder="sk-..." autocapitalize="off" autocorrect="off" spellcheck="false">
+        </label>
+        <label>Модель
+          <input type="text" id="set-model" placeholder="gpt-4o-mini" autocapitalize="off" autocorrect="off" spellcheck="false">
+        </label>
+
+        <div class="test-row">
+          <button id="test-connection" class="btn-primary" type="button">🔌 Проверить подключение</button>
+          <span id="test-result" class="test-result"></span>
+        </div>
+
+        <small class="hint">Поддерживаются любые OpenAI-совместимые API (OpenAI, OpenRouter, Groq, DeepSeek, локальные и т.д.).</small>
+      </div>
+
+      <div class="tab-content" data-tab="gen">
+        <label>Max Tokens
+          <input type="number" id="set-maxTokens" min="1" step="1" inputmode="numeric">
+        </label>
+        <label>Temperature <span id="temp-val" class="val"></span>
+          <input type="range" id="set-temperature" min="0" max="2" step="0.05">
+        </label>
+        <label>Top P <span id="topp-val" class="val"></span>
+          <input type="range" id="set-topP" min="0" max="1" step="0.05">
+        </label>
+        <label>Presence Penalty <span id="pp-val" class="val"></span>
+          <input type="range" id="set-presencePenalty" min="-2" max="2" step="0.1">
+        </label>
+        <label>Frequency Penalty <span id="fp-val" class="val"></span>
+          <input type="range" id="set-frequencyPenalty" min="-2" max="2" step="0.1">
+        </label>
+        <label>Reasoning Effort
+          <select id="set-reasoningEffort">
+            <option value="">По умолчанию</option>
+            <option value="low">low</option>
+            <option value="medium">medium</option>
+            <option value="high">high</option>
+          </select>
+        </label>
+        <label class="checkbox">
+          <input type="checkbox" id="set-webSearch"> Поиск в интернете (web_search)
+        </label>
+        <label class="checkbox">
+          <input type="checkbox" id="set-autoRetry"> Автоповтор запроса при сетевой ошибке (1 раз)
+        </label>
+      </div>
+
+      <div class="tab-content" data-tab="prompt">
+        <textarea id="set-systemPrompt" rows="14" spellcheck="false" autocapitalize="off" autocorrect="off"></textarea>
+        <small class="hint">Системный промпт определяет поведение ИИ и формат терминальных команд.</small>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button id="reset-settings" class="btn-ghost">Сбросить</button>
+      <button id="save-settings" class="btn-primary">Сохранить</button>
+    </div>
+  </div>
+</div>
+
+<!-- Модальное окно запуска кода -->
+<div class="modal" id="run-modal">
+  <div class="modal-content run-modal-content">
+    <div class="modal-header">
+      <h2 id="run-title">Запуск</h2>
+      <div class="run-actions">
+        <button id="run-reload" class="icon-btn" title="Перезапустить" aria-label="Перезапустить">↻</button>
+        <button id="run-open" class="icon-btn" title="Открыть в новой вкладке" aria-label="Новая вкладка">↗</button>
+        <button id="run-close" class="icon-btn" title="Закрыть" aria-label="Закрыть">✕</button>
+      </div>
+    </div>
+    <div class="run-body">
+      <iframe id="run-iframe" sandbox="allow-scripts allow-modals allow-forms allow-popups allow-pointer-lock allow-downloads"></iframe>
+    </div>
+  </div>
+</div>
+
+<script src="js/ai.js"></script>
+<script src="js/app.js"></script>
+</body>
+</html>
